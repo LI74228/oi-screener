@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: oi-screener
+    runtime: python
+    plan: free
+    buildCommand: ""
+    startCommand: python oi_live.py
+    envVars:
+      - key: ALGOPACK_TOKEN
+        sync: false
+      - key: ACCESS_KEY
+        sync: false

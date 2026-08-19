@@ -1,0 +1,6 @@
+algopack_token.txt
+*.txt
+__pycache__/
+*.pyc
+_6mo_cache/
+_screener_run.log
