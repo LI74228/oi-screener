@@ -581,6 +581,13 @@ HTML = """<!doctype html>
   .acc.hide{display:none}
   .acc.live{border-color:#f0a23a; animation:accpulse 1.5s ease-in-out infinite}
   .acc.past{opacity:.85; border-color:#6e5128; background:rgba(16,13,9,.92); color:#d8c2a0}
+  .acc.full{padding-right:22px}
+  .acc.mini{left:auto; right:6px; transform:none; max-width:none; padding:2px 8px; cursor:pointer;
+    font-size:12.5px; font-weight:700; animation:none; box-shadow:0 3px 10px rgba(0,0,0,.45)}
+  .acc.mini:hover{filter:brightness(1.25)}
+  .acc .cx{position:absolute; top:2px; right:5px; cursor:pointer; color:#c9a87a; font:inherit;
+    font-size:15px; line-height:1; padding:0 3px; border:0; background:transparent}
+  .acc .cx:hover{color:#fff}
   .acc .ttl{font-weight:700}
   .acc b{color:#ffb347}
   .acc .q{margin-top:3px; display:flex; gap:6px; align-items:center; justify-content:center; color:#cdd6e0}
@@ -743,20 +750,36 @@ function accLabels(){ try{ return JSON.parse(localStorage.getItem(ACC_KEY)||"{}"
 function setAccLabel(k,v){ const m=accLabels(); if(v===null) delete m[k]; else m[k]=v;
   try{ localStorage.setItem(ACC_KEY, JSON.stringify(m)); }catch(_){} }
 
+// свёрнута/развёрнута плашка участника — общий флаг (чтобы не мешала обзору графика)
+const ACC_COLLAPSE_KEY = "oi_acc_collapsed";
+function accCollapsed(){ try{ return localStorage.getItem(ACC_COLLAPSE_KEY)==="1"; }catch(_){ return false; } }
+function setAccCollapsed(v){ try{ localStorage.setItem(ACC_COLLAPSE_KEY, v?"1":"0"); }catch(_){}
+  for(let i=0;i<state.wins.length;i++) drawWindow(i); }   // перерисовать все окна — свернуть/развернуть везде
+
 // чип-подсказка + вопрос трейдеру (не зависит от индекса окна)
 function renderAccumChip(box, w, ev){
   if(!box) return;
+  box.onclick = null;
   if(!ev){ box.className="acc hide"; box.innerHTML=""; return; }
+  if(accCollapsed()){                                     // свёрнуто -> маленький флажок в углу, клик разворачивает
+    const arrow = w.side==="long"?"↑":"↓";
+    box.className = "acc mini " + (ev.active?"live":"past");
+    box.innerHTML = `<span title="Показать плашку участника">⚑${arrow}</span>`;
+    box.onclick = ()=> setAccCollapsed(false);
+    return;
+  }
   const k=[w.code,w.group,w.side,ev.date].join("|"), lab=accLabels()[k];
   const nm = w.side==="long"?"в ЛОНГ":"в ШОРТ";
   const head = ev.active ? "⚑ Возможно набирается участник" : "⚑ Был набор сегодня";
-  let html = `<div class="ttl">${head} ${nm}</div>`
+  let html = `<button class="cx" title="Свернуть">−</button>`
+    + `<div class="ttl">${head} ${nm}</div>`
     + `<div>≈ <b>${fmt(ev.excess)}</b> контр. немногими · конц. ${Math.round(ev.conc*100)}% · пик ${ev.time.slice(0,5)}</div>`;
   if(lab==="yes")      html += `<div class="q" style="color:#2ad17e">✓ отмечен как реальный <a href="#" data-act="clear">сброс</a></div>`;
   else if(lab==="no")  html += `<div class="q" style="color:#f05462">✗ отмечен как ложный <a href="#" data-act="clear">сброс</a></div>`;
   else                 html += `<div class="q">Реальный участник? <button data-act="yes">Да</button><button data-act="no">Нет</button></div>`;
-  box.className = "acc " + (ev.active?"live":"past");
+  box.className = "acc full " + (ev.active?"live":"past");
   box.innerHTML = html;
+  box.querySelector(".cx").onclick = (e)=>{ e.preventDefault(); e.stopPropagation(); setAccCollapsed(true); };
   box.querySelectorAll("[data-act]").forEach(b=> b.onclick=(e)=>{ e.preventDefault();
     setAccLabel(k, b.dataset.act==="clear"?null:b.dataset.act); renderAccumChip(box, w, ev); });
 }
