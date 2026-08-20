@@ -4,3 +4,7 @@ __pycache__/
 *.pyc
 _6mo_cache/
 _screener_run.log
+docs/
+_build.log
+_srv.log
+_ghlogin.log
