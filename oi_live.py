@@ -69,7 +69,13 @@ def http_get(url, token=None, timeout=5, tries=2):
                 except Exception:
                     pass
                 return e.code, body
+            except urllib.error.URLError as e:            # обычно заворачивает SSL-ошибку внутрь .reason
+                last = (0, str(e))
+                if isinstance(getattr(e, "reason", None), ssl.SSLError):
+                    continue                              # корневой CA apim (рос.) не в доверенных на зарубеж. раннере -> ctx без проверки
+                break                                     # прочий сетевой сбой -> повтор
             except ssl.SSLError:                          # пробуем без проверки сертификата
+                last = (0, "ssl")
                 continue
             except Exception as e:                        # сетевой сбой/таймаут — повтор
                 last = (0, str(e))
