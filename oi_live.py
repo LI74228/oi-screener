@@ -644,7 +644,7 @@ const COL_LONG = "#2ad17e", COL_SHORT = "#f05462";
 const COL_OI = "#4b85ff", COL_CONC = "#f5b23a";          // поток ОИ / концентрация HHI
 const SRC_VALS = ["futoi","flow","conc"];
 const SOURCES = [["ОИ Физ/Юр","futoi"],["Поток сделок","flow"],["Концентрация","conc"]];
-const FLOW_METRICS = [["ОИ контракта","oi"],["Дисбаланс ▲▼","disb"]];
+const FLOW_METRICS = [["ОИ контракта","oi"],["Открытка ΔОИ","doi"],["Дисбаланс ▲▼","disb"]];
 const CONC_METRICS = [["HHI агрессоры","hhi_agressive"],["HHI покупки","hhi_buy"],
   ["HHI продажи","hhi_sell"],["HHI пассив","hhi_passive"],["HHI объём","hhi_volume"]];
 const MINSPAN = 6;
@@ -1198,7 +1198,7 @@ function drawSeries(i, card, w){
   if(j.source==="error"){ fail(j.message||"нет данных"); return; }
   const cols=j.columns||[], ci=name=>cols.indexOf(name);
 
-  let cells=[], valOf, mode, col=COL_OI, ttl="", fmtVal=fmt;
+  let cells=[], valOf, mode, col=COL_OI, ttl="", fmtVal=fmt, histPos=COL_LONG, histNeg=COL_SHORT;
   if(w.src==="flow"){
     const iD=ci("date"),iT=ci("time"),iOI=ci("oi"),iVb=ci("vb"),iVs=ci("vs"),iC=ci("close");
     const objs=(j.data||[]).map(r=>({date:r[iD],time:r[iT],ms:Date.parse(r[iD]+"T"+r[iT]),
@@ -1208,6 +1208,10 @@ function drawSeries(i, card, w){
     if(w.metric==="disb"){ mode="hist"; ttl="Дисбаланс";
       for(const c of cells){ const tot=c.vb+c.vs; c.v = tot? (c.vb-c.vs)/tot*100 : 0; }
       valOf=c=>c.v; fmtVal=v=>(v>0?"+":"")+Math.round(v)+"%"; }
+    else if(w.metric==="doi"){ mode="hist"; ttl="Открытка ΔОИ";   // прирост ОИ за бар: синий вверх / красный вниз
+      histPos=COL_OI; histNeg=COL_SHORT;
+      let pc=null; for(const c of cells){ c.v = (pc==null ? (c.c-c.o) : (c.c-pc)); pc=c.c; }
+      valOf=c=>c.v; fmtVal=fmtSign; }
     else { mode=(w.type==="candle"?"candle":"line"); col=COL_OI; ttl="ОИ контракта"; valOf=c=>c.c; }
   } else {  // conc — дневные точки HHI
     const iD=ci("date"),iT=ci("time"),iM=ci(w.metric);
@@ -1249,7 +1253,7 @@ function drawSeries(i, card, w){
   for(let k=0;k<=4;k++){ const val=vmin+(vmax-vmin)*k/4, y=Y(val);
     ctx.strokeStyle="#121a24"; ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(W-padR,y); ctx.stroke();
     ctx.fillStyle="#5a6776"; ctx.textAlign="right";
-    ctx.fillText(mode==="hist"? (val>0?"+":"")+Math.round(val)+"%" : fmt(val), padL-7, y); }
+    ctx.fillText(mode==="hist"? fmtVal(val) : fmt(val), padL-7, y); }
   ctx.textAlign="center"; ctx.textBaseline="top";
   const xt=Math.min(6,n); let prev="";
   for(let k=0;k<xt;k++){ const cci=Math.round(k/(xt-1||1)*(n-1)), x=X(cci);
@@ -1260,7 +1264,7 @@ function drawSeries(i, card, w){
     const y0=Y(0); ctx.strokeStyle="#2a3648"; ctx.beginPath(); ctx.moveTo(padL,y0); ctx.lineTo(W-padR,y0); ctx.stroke();
     const bw=Math.max(1.5, Math.min(16, plotW/Math.max(1,n)*0.7));
     for(let k=0;k<n;k++){ const val=valOf(vis[k]), x=X(k), y=Y(val);
-      ctx.fillStyle = val>=0?COL_LONG:COL_SHORT;
+      ctx.fillStyle = val>=0?histPos:histNeg;
       ctx.fillRect(x-bw/2, Math.min(y,y0), bw, Math.max(1,Math.abs(y-y0))); }
   } else if(mode==="candle"){
     const cw=Math.max(1.5, Math.min(14, plotW/Math.max(1,n)*0.66));
@@ -1281,7 +1285,7 @@ function drawSeries(i, card, w){
   }
 
   (function(){ const val=valOf(last), y=Y(val), t=fmtVal(val); ctx.font="bold 10px Segoe UI,Arial";
-    const lc = mode==="hist" ? (val>=0?COL_LONG:COL_SHORT) : col;
+    const lc = mode==="hist" ? (val>=0?histPos:histNeg) : col;
     const tw=ctx.measureText(t).width, bx=Math.min(X(n-1), W-padR-tw/2-3);
     ctx.fillStyle=lc; roundRect(ctx,bx-tw/2-6,y-8,tw+12,16,4); ctx.fill();
     ctx.fillStyle="#06100a"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(t,bx,y); })();
@@ -1291,12 +1295,14 @@ function drawSeries(i, card, w){
     const c=vis[hi], x=X(hi), y=Y(valOf(c));
     ctx.save(); ctx.strokeStyle="#36465a"; ctx.setLineDash([4,4]);
     ctx.beginPath(); ctx.moveTo(x,padT); ctx.lineTo(x,padT+plotH); ctx.stroke(); ctx.setLineDash([]);
-    const dc = mode==="hist" ? (valOf(c)>=0?COL_LONG:COL_SHORT) : col;
+    const dc = mode==="hist" ? (valOf(c)>=0?histPos:histNeg) : col;
     ctx.fillStyle=dc; ctx.beginPath(); ctx.arc(x,y,3.5,0,7); ctx.fill();
     ctx.strokeStyle="#fff"; ctx.lineWidth=1.2; ctx.stroke(); ctx.restore();
     let bodyHtml;
     if(w.src==="flow" && w.metric==="disb")
       bodyHtml = `<span style="color:${dc}">${ttl} ${fmtVal(valOf(c))}</span><br>▲ покуп ${fmt(c.vb)} · ▼ прод ${fmt(c.vs)}`;
+    else if(w.src==="flow" && w.metric==="doi")
+      bodyHtml = `<span style="color:${dc}">ΔОИ ${fmtSign(valOf(c))}</span> контр.<br>ОИ ${fmt(c.c)} · цена ${c.close}`;
     else if(w.src==="flow")
       bodyHtml = `<span style="color:${col}">${ttl} ${fmt(c.c)}</span> · цена ${c.close}`
         + (mode==="candle"?`<br>О ${fmt(c.o)} · Макс ${fmt(c.h)} · Мин ${fmt(c.l)}`:``);
