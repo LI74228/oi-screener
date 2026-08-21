@@ -37,6 +37,16 @@ def write(name, obj):
     print("  ->", name, "(%d Б)" % os.path.getsize(p))
 
 
+# 0) диагностика: отвечает ли платный apim с этого раннера (в облаке IP зарубежный —
+#    MOEX может блокировать/отклонять платный endpoint; на российском IP ПК всё работает).
+try:
+    _tok = oi_live.read_token()
+    _st, _b = oi_live.http_get(oi_live.APIM.format(t="CR", f=TILL, d=TILL), _tok, timeout=8, tries=1)
+    print("APIM PROBE: token_len=%d http=%s bytes=%d head=%r"
+          % (len(_tok or ""), _st, len(_b or ""), (_b or "")[:200]))
+except Exception as _e:
+    print("APIM PROBE error:", _e)
+
 # 1) futoi — все инструменты за месяц
 print("futoi /api/all %s..%s" % (FRM, TILL))
 allj = oi_live.fetch_all(FRM, TILL)
